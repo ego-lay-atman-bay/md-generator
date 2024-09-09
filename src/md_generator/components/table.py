@@ -50,9 +50,6 @@ class Table(BaseBlockNode):
         header = []
         for cell in zip_longest(self.__display_header, self.header):
             header.append(cell[0] if cell[0] else cell[1])
-        print(self.__display_header)
-        print(self.header)
-        print(header)
         self.__display_header = header
         return header
     
