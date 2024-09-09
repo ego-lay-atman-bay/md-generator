@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md_generator"
+authors = [
+  { name="ego-lay-atman-bay" },
+]
+# version = "0.0.1"
+description = "Generate markdown text with python objects."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "furl",
+  "Markdown",
+  "beautifulsoup4",
+  "charset-normalizer",
+]
+dynamic = ["version"]
+
+# [project.urls]
+# "Homepage" = "https://github.com/ego-lay-atman-bay/audioman/"
+# "Bug Tracker" = "https://github.com/ego-lay-atman-bay/audioman/issues/"
+# "Documentation" = "https://ego-lay-atman-bay.github.io/audioman/"
+
+[tool.setuptools.dynamic]
+version = { attr = "md_generator.__version__" }
