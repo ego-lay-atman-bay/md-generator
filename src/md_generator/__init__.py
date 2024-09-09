@@ -8,6 +8,7 @@ from .components.codeblock import CodeBlock
 from .components.document import Document
 from .components.group import Group
 from .components.heading import Heading
+from .components.horizontalrule import HorizontalRule
 from .components.image import Image
 from .components.lines import Lines
 from .components.link import Link
@@ -17,7 +18,7 @@ from .components.paragraph import Paragraph
 from .components.sentence import Sentence
 from .components.table import Table
 from .components.text import Text
-from .components.horizontalrule import HorizontalRule
+from .md_format import md_format
 
 __all__ = [
     "BaseNode",
@@ -37,4 +38,5 @@ __all__ = [
     "Sentence",
     "NewLine",
     "HorizontalRule",
+    "md_format",
 ]

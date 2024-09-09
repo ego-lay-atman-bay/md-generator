@@ -31,6 +31,7 @@ class Table(BaseBlockNode):
                 header = header[0]
         
         self.header = header
+        self.display_header = None
         self.rows = rows
         self.alignment = alignment
     
@@ -41,7 +42,26 @@ class Table(BaseBlockNode):
     def header(self, value: Iterable[Any]):
         if value == None:
             self.__header = []
-        self.__header = value
+        else:
+            self.__header = list(value)
+    
+    @property
+    def display_header(self):
+        header = []
+        for cell in zip_longest(self.__display_header, self.header):
+            header.append(cell[0] if cell[0] else cell[1])
+        print(self.__display_header)
+        print(self.header)
+        print(header)
+        self.__display_header = header
+        return header
+    
+    @display_header.setter
+    def display_header(self, header: list[str]):
+        if header == None:
+            self.__display_header = []
+        else:
+            self.__display_header = list(header)
     
     @property
     def rows(self) -> list[list[Any]]:
@@ -144,6 +164,16 @@ class Table(BaseBlockNode):
         if len(rules):
             self.rows = filter(lambda row: keep(row), self.rows)
     
+    def set_header_order(self, new_header: list[str] | dict[str, str]):
+        if isinstance(new_header, (list, tuple)):
+            new_header = {cell: cell for cell in new_header}
+
+        new_rows = [[row[self.header.index(name)] if name in self.header else '' for name in new_header] for row in self.rows]
+        
+        self.header = new_header.items()
+        self.display_header = new_header.values()
+        self.rows = new_rows
+    
     def _create_row(self, row: list, lengths: list[int], alignment: list[Literal[ALIGNMENT.LEFT, ALIGNMENT.CENTER, ALIGNMENT.RIGHT]], pad_char: str = " "):
         padding_directions = {
             ALIGNMENT.LEFT: '<',
@@ -185,10 +215,11 @@ class Table(BaseBlockNode):
         text = ""
         
         header = [escape(str(cell).replace('\n', '<br>'), '|') for cell in self.header]
+        display_header = [escape(cell).replace('\n', '<br>') for cell in self.display_header]
         rows = [[escape(str(cell).replace('\n', '<br>'), '|') for cell in row] for row in self.rows]
-        column_lengths = [max([len(escape(cell, '|')) for cell in column]) for column in zip(header, *rows)]
+        column_lengths = [max([len(escape(cell, '|')) for cell in column]) for column in zip(display_header, *rows)]
         
-        table.append(self._create_row(header, column_lengths, self.alignment))
+        table.append(self._create_row(display_header, column_lengths, self.alignment))
         table.append(self._create_under_header_row(column_lengths, self.alignment))
         for row in rows:
             table.append(self._create_row(row, column_lengths, self.alignment))
@@ -258,5 +289,21 @@ class Table(BaseBlockNode):
                                 filter_rules[rule[0]] = rule[1]
                     
                     formatted_table.filter(filter_rules)
+                
+                elif part[0] == 'order':
+                    order = {}
+                    if isinstance(part[1], str):
+                        order[part[1]] = part[1]
+                    elif isinstance(part[1], list):
+                        for cell in part[1]:
+                            if isinstance(cell, str):
+                                order[cell] = cell
+                            elif isinstance(cell, list):
+                                if len(cell) == 1:
+                                    order[cell[0]] = cell[0]
+                                if len(cell) > 1:
+                                    order[cell[0]] = cell[1]
+                    
+                    formatted_table.set_header_order(order)
                     
         return str(formatted_table)
