@@ -232,22 +232,22 @@ def parse_format_spec(format_spec: str):
                 raw_escape = False
                 quote_char = ''
                 continue
-        elif is_empty_value() and character() == 'r' and character(1) in "\"'":
+        elif is_empty_value() and character() == 'r' and character(1) in ["'", '"']:
             raw_escape = True
             quote_char = character(1)
             index += 1
             continue
-        elif is_empty_value() and character() and character() in "\"'":
+        elif is_empty_value() and character() and character() in ["'", '"']:
             raw_escape = False
             quote_char = character()
             continue
-        elif character() and character() in '{[<':
+        elif character() and character() in ['(','{','[','<']:
             if character() == '[' and ']' not in brackets:
                 brackets.append(']')
                 char = '{'
             else:
                 print('char', character())
-                brackets.append({'{': '}', '[': ']', '<': '>'}[character()])
+                brackets.append({'(': ')', '{': '}', '[': ']', '<': '>'}[character()])
         elif len(brackets):
             if character() == brackets[-1]:
                 brackets.pop()
