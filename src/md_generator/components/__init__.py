@@ -23,7 +23,7 @@ for name, component in {
     "paragraph": Paragraph,
     "text": Text,
     "table": Table,
-    "csv": lambda csv_file: Table.from_csv(csv_file),
+    "csv": Table.from_csv,
     "blockquote": BlockQuote,
     "quote": BlockQuote,
     "code": CodeBlock,
@@ -37,5 +37,6 @@ for name, component in {
     "bold": lambda x: Text(x, bold = True),
     "italic": lambda x: Text(x, italic = True),
     "code": lambda x: Text(x, code = True),
+    "split": Group.from_str
 }.items():
     MDFormatter.register_component(name, component)

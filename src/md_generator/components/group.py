@@ -1,6 +1,9 @@
 from typing import Iterable, overload
 
+from ..md_format import parse_format_spec, parse_format_spec_part, md_format
 from .base import BaseNode
+# from .text import Text
+
 
 class Group(BaseNode, list):
     separator: str = ''
@@ -24,5 +27,34 @@ class Group(BaseNode, list):
     def write(self) -> str:
         return self.separator.join([str(part) for part in self])
     
+    @classmethod
+    def from_str(cls, string: str, separator: str = ';'):
+        return Group(str(string).split(separator), separator = separator)
+    
     def __add__(self, value):
         return Group(list.__add__(self, value))
+    
+    def __format__(self, format_spec: str) -> str:
+        formatted_group = self.copy()
+        
+        split_spec, rest = parse_format_spec_part(format_spec)
+        if split_spec[0] and isinstance(split_spec[0], str):
+            formatted_group.separator = split_spec[0]
+            split_spec, rest = parse_format_spec_part(format_spec)
+        else:
+            rest = format_spec
+        
+        for part in split_spec:
+            if isinstance(part, tuple):
+                if part[0] in ['sep', 'separator']:
+                    formatted_group.separator = part[1]
+                    split_spec, rest = parse_format_spec_part(format_spec)
+
+        new_group = Group(separator = formatted_group.separator)
+        for item in formatted_group:
+            if isinstance(item, (list, tuple, set)):
+                item = Group(item, separator = formatted_group.separator)
+            
+            new_group.append(md_format(f'{{item:{rest}}}', item = item))
+            
+        return str(new_group)

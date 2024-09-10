@@ -14,7 +14,7 @@ from .enums import ALIGNMENT, ALIGNMENT_SHORT
 from .. import csv_tools
 
 
-from ..md_format import parse_format_spec
+from ..md_format import parse_format_spec, md_format
 
 class Table(BaseBlockNode):
     def __init__(
@@ -180,6 +180,27 @@ class Table(BaseBlockNode):
         self.display_header = new_header.values()
         self.rows = new_rows
     
+    def transform(self, row_transformations: dict[str, str]):
+        if not isinstance(row_transformations, dict):
+            raise TypeError('row_transformations must be dict')
+        
+        rows_dict = self.as_dict()
+        rows = []
+        
+        for row_dict in rows_dict:
+            row = []
+            for key, new in row_transformations.items():
+                if key not in row_dict:
+                    continue
+                row_dict[key] = md_format(new, **row_dict)
+            
+            for key in self.header:
+                row.append(row_dict.get(key, ''))
+            
+            rows.append(row)
+        
+        self.rows = rows
+    
     def _create_row(self, row: list, lengths: list[int], alignment: list[Literal[ALIGNMENT.LEFT, ALIGNMENT.CENTER, ALIGNMENT.RIGHT]], pad_char: str = " "):
         padding_directions = {
             ALIGNMENT.LEFT: '<',
@@ -261,6 +282,9 @@ class Table(BaseBlockNode):
         formatted_table = deepcopy(self)
         
         split_spec = parse_format_spec(format_spec)
+
+        print('spec', format_spec)
+        
         for part in split_spec:
             if isinstance(part, tuple):
                 if part[0] == 'sort':
@@ -334,5 +358,13 @@ class Table(BaseBlockNode):
                             
                             index += 1
                     formatted_table.alignment = align
+                
+                elif part[0] == 'transform':
+                    transformations = {}
+                    if isinstance(part[1], list):
+                        for section in part[1]:
+                            if isinstance(section, list):
+                                transformations[section[0]] = section[1]
+                    formatted_table.transform(transformations)
                     
         return str(formatted_table)

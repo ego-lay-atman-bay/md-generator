@@ -57,3 +57,6 @@ class Text(BaseNode):
             return Group([self, value])
         
         return Text(str(self.text) + str(value), self.bold, self.italic)
+    
+    def __format__(self, format_spec: str) -> str:
+        return super().__format__(format_spec)

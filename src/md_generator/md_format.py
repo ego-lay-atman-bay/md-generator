@@ -7,6 +7,8 @@ from collections.abc import Sequence
 
 import charset_normalizer
 
+from .utils import escape
+
 if TYPE_CHECKING:
     from .components import BaseNode
 
@@ -110,8 +112,43 @@ class SafeFormatDict(dict):
     def __getitem__(self, key):
         return EscapeFormat(super().__getitem__(key))
 
+class KeyValue():
+    value: Any = None
+    conversion: str = ''
+    
+    def __init__(self, key: str, value: Any) -> None:
+        self.key = key
+        self.value = value
+    
+    @property
+    def key(self):
+        if self.__key == None:
+            return str(self.value)
+        return self.__key
+    @key.setter
+    def key(self, key):
+        if key == None:
+            self.__key = None
+        self.__key = str(key)
+    
+    def __str__(self) -> str:
+        return str(self.value)
+    
+    def __repr__(self) -> str:
+        return repr(self.value)
+    
+    def __getattr__(self, name: str) -> Any:
+        if name in dir(self.value):
+            return getattr(self.value, name)
+
 class MDFormatter(string.Formatter):
     COMPONENTS = {}
+    
+    def vformat(self, format_string, args, kwargs):
+        used_args = set()
+        result, _ = self._vformat(format_string, args, kwargs, used_args, 99) # I want a large recursive limit
+        self.check_unused_args(used_args, args, kwargs)
+        return result
     
     @classmethod
     def register_component(cls, name: str, component: "BaseNode | Callable[[str], BaseNode]"):
@@ -122,37 +159,105 @@ class MDFormatter(string.Formatter):
     
     def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
         try:
-            return super().get_field(field_name, args, kwargs)
+            value, key = super().get_field(field_name, args, kwargs)
+            return KeyValue(field_name, value), key
         except:
             if field_name.startswith('[') and field_name.endswith(']') and os.path.isfile(field_name[1:-1]):
                 contents = field_name[1:-1]
                 file = charset_normalizer.from_path(field_name[1:-1]).best()
                 contents = file.output().decode()
-                return FileContents(contents), field_name
+                return KeyValue(field_name, FileContents(contents)), field_name
             else:
-                return MissingKey(field_name), field_name
+                return KeyValue(field_name, MissingKey(field_name)), field_name
     
     
     def convert_field(self, value, conversion: str | None):
+        key = ''
+        
+        if isinstance(value, KeyValue):
+            key = value.key
+            value = value.value
+        
         if isinstance(value, (MissingKey, FileContents)):
             value.conversion = conversion
-            return value
-        return super().convert_field(value, conversion)
+            result = KeyValue(key, value)
+        else:
+            result = KeyValue(key, super().convert_field(value, conversion))
+
+        result.conversion = conversion
+
+        return result
     
     def format_field(self, value: Any, format_spec: str) -> Any:
         # if isinstance(value, MissingKey):
         #     return f'{{{super().format_field(value, format_spec)}}}'
         
         result = str(value)
-        split_spec = format_spec.split(':')
+        
+        old = format_spec
+        split_spec, rest = parse_format_spec_part(format_spec)
+        
+        bracket_level = 0
+        
+        if len(split_spec[0]) > 2 and isinstance(split_spec[0], str) and split_spec[0][0] + split_spec[0][-1] == '{}':
+            bracket_str_num = ''
+            if isinstance(split_spec[0], str):
+                bracket_str_num = split_spec[0][1:-1]
+            else:
+                bracket_str_num = split_spec[0][1]
+            
+            if bracket_str_num.isnumeric():
+                bracket_level = int(bracket_str_num)
+            
+            old = rest
+            split_spec, rest = parse_format_spec_part(rest)
+            
+        if bracket_level > 0:
+            key = str(value)
+            conversion = None
+            if isinstance(value, KeyValue):
+                key = value.key
+                conversion = value.conversion
+            
+            return ('{' * (2 ** (bracket_level - 1))) + key + (f'!{conversion}' if conversion else '') + (f':{old}' if old else '') + '}' * (2 ** (bracket_level - 1))
+        
+        if isinstance(value, KeyValue):
+            value = value.value
         
         if len(split_spec) > 0:
-            component_name = split_spec[0].lower()
-            if component_name in self.COMPONENTS:
-                component = self.COMPONENTS[component_name](value)
-                result = super().format_field(component, ':'.join(split_spec[1::]))
+            for part in split_spec:
+                if isinstance(part, str):
+                    component_name = part.lower()
+                    if component_name in self.COMPONENTS:
+                        component = self.COMPONENTS[component_name](value)
+                        result = super().format_field(component, rest)
+                        break
+                    else:
+                        result = super().format_field(value, old)
+                        break
+                elif isinstance(part, tuple):
+                    component_name = part[0].lower()
+                    if component_name in self.COMPONENTS:
+                        args = []
+                        kwargs = {}
+                        
+                        if isinstance(part[1], str):
+                            args.append(part[1])
+                        else:
+                            for arg in part[1]:
+                                if isinstance(arg, str):
+                                    args.append(arg)
+                                elif isinstance(arg, list):
+                                    kwargs[arg[0]] = arg[1]
+                        
+                        component = self.COMPONENTS[component_name](value, *args, **kwargs)
+                        result = super().format_field(component, rest)
+                        break
+                    else:
+                        result = super().format_field(value, old)
+                        break
         else:
-            result = super().format_field(value, format_spec)
+            result = super().format_field(value, old)
         
         if hasattr(value, 'conversion') and value.conversion:
             result = super().convert_field(result, value.conversion)
@@ -183,6 +288,25 @@ def parse_format_spec(format_spec: str):
     
     """
     
+    result = []
+    rest = format_spec
+    
+    while rest != '':
+        new, rest = parse_format_spec_part(rest)
+        result.extend(new)
+    
+    return result
+
+
+def parse_format_spec_part(format_spec: str) -> tuple[list, str]:
+    """Parse format spec part
+
+    Args:
+        format_spec (str): format spec
+
+    Returns:
+        tuple[list, str]: (parsed, rest)
+    """
     index = -1
     result = []
     character = lambda peek = 0: format_spec[index + peek] if (index + peek) < len(format_spec) else ''
@@ -242,23 +366,20 @@ def parse_format_spec(format_spec: str):
             quote_char = character()
             continue
         elif character() and character() in ['(','{','[','<']:
-            if character() == '[' and ']' not in brackets:
-                brackets.append(']')
-                char = '{'
-            else:
-                print('char', character())
-                brackets.append({'(': ')', '{': '}', '[': ']', '<': '>'}[character()])
+            # if character() == '[' and ']' not in brackets:
+            #     brackets.append(']')
+            #     char = '{'
+            # else:
+            #     print('char', character())
+            brackets.append({'(': ')', '{': '}', '[': ']', '<': '>'}[character()])
         elif len(brackets):
             if character() == brackets[-1]:
                 brackets.pop()
-                if ']' not in brackets:
-                    char = '}'
+                # if ']' not in brackets:
+                #     char = '}'
         elif character() == ':':
-            result.append(get_section_item())
-            key = ''
-            value = []
             mode = 'key'
-            continue
+            break
         elif mode == 'key':
             if character() == '=':
                 mode = 'value'
@@ -284,5 +405,4 @@ def parse_format_spec(format_spec: str):
     
     result.append(get_section_item())
     
-    return result
-
+    return result, format_spec[index + 1::]

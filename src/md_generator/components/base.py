@@ -1,5 +1,7 @@
 from abc import abstractmethod
 
+from copy import deepcopy
+
 class BaseNode():
     block: bool = False
     
@@ -15,6 +17,9 @@ class BaseNode():
     
     def __format__(self, format_spec: str) -> str:
         return str(self).__format__(format_spec)
+    
+    def copy(self):
+        return deepcopy(self)
 
 class BaseBlockNode(BaseNode):
     block = True
