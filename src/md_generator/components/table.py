@@ -10,7 +10,7 @@ import re
 
 from ..utils import escape, strbool
 from .base import BaseBlockNode
-from .enums import ALIGNMENT
+from .enums import ALIGNMENT, ALIGNMENT_SHORT
 from .. import csv_tools
 
 
@@ -48,7 +48,7 @@ class Table(BaseBlockNode):
     @property
     def display_header(self):
         header = []
-        for cell in zip_longest(self.__display_header, self.header):
+        for cell in zip_longest(self.__display_header[0:len(self.header)], self.header):
             header.append(cell[0] if cell[0] else cell[1])
         self.__display_header = header
         return header
@@ -88,7 +88,7 @@ class Table(BaseBlockNode):
     @property
     def alignment(self) -> list[Literal[ALIGNMENT.LEFT, ALIGNMENT.CENTER, ALIGNMENT.RIGHT]]:
         header_length = len(self.header)
-        alignment: list[Literal[ALIGNMENT.LEFT, ALIGNMENT.CENTER, ALIGNMENT.RIGHT]] = self._alignment
+        alignment: list[Literal[ALIGNMENT.LEFT, ALIGNMENT.CENTER, ALIGNMENT.RIGHT]] = self.__alignment
 
         if not isinstance(alignment, (list, tuple)):
             alignment = [alignment]
@@ -105,15 +105,24 @@ class Table(BaseBlockNode):
         
         for column in range(len(alignment)):
             alignment[column] = str(alignment[column]).lower()
+
+            if alignment[column] in ALIGNMENT_SHORT:
+                alignment[column] = {
+                    ALIGNMENT_SHORT.LEFT: ALIGNMENT.LEFT,
+                    ALIGNMENT_SHORT.CENTER: ALIGNMENT.CENTER,
+                    ALIGNMENT_SHORT.RIGHT: ALIGNMENT.RIGHT,
+                }[alignment[column]]
+            
             if alignment[column] not in ALIGNMENT:
                 alignment[column] = ALIGNMENT.LEFT
+            
         
         self.alignment = alignment
         return alignment
     
     @alignment.setter
     def alignment(self, value):
-        self._alignment = value
+        self.__alignment = value
     
     def as_dict(self):
         return [{self.header[index]: cell for index, cell in enumerate(row)} for row in self.rows]
@@ -302,5 +311,28 @@ class Table(BaseBlockNode):
                                     order[cell[0]] = cell[1]
                     
                     formatted_table.set_header_order(order)
+                
+                elif part[0] == 'align':
+                    align = formatted_table.alignment
+                    
+                    if isinstance(part[1], str):
+                        alignment = part[1].lower()
+                        if alignment in ALIGNMENT:
+                            align = [alignment]
+                        else:
+                            align = list(alignment)
+                    elif isinstance(part[1], list):
+                        index = 0
+                        for cell in part[1]:
+                            if isinstance(cell, list):
+                                if cell[0] in formatted_table.header:
+                                    index = formatted_table.header.index(cell[0])
+                                    align[index] = cell[1]
+                            else:
+                                if index < len(align):
+                                    align[index] = cell
+                            
+                            index += 1
+                    formatted_table.alignment = align
                     
         return str(formatted_table)
