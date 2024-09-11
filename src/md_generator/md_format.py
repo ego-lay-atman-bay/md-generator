@@ -144,6 +144,10 @@ class KeyValue():
 class MDFormatter(string.Formatter):
     COMPONENTS = {}
     
+    def __init__(self, base_dir = '.') -> None:
+        self.base_dir = base_dir
+        super().__init__()
+    
     def vformat(self, format_string, args, kwargs):
         used_args = set()
         result, _ = self._vformat(format_string, args, kwargs, used_args, 99) # I want a large recursive limit
@@ -162,9 +166,9 @@ class MDFormatter(string.Formatter):
             value, key = super().get_field(field_name, args, kwargs)
             return KeyValue(field_name, value), key
         except:
-            if field_name.startswith('[') and field_name.endswith(']') and os.path.isfile(field_name[1:-1]):
+            if field_name.startswith('[') and field_name.endswith(']') and os.path.isfile(os.path.join(self.base_dir, field_name[1:-1])):
                 contents = field_name[1:-1]
-                file = charset_normalizer.from_path(field_name[1:-1]).best()
+                file = charset_normalizer.from_path(os.path.join(self.base_dir, field_name[1:-1])).best()
                 contents = file.output().decode()
                 return KeyValue(field_name, FileContents(contents)), field_name
             else:
@@ -271,7 +275,11 @@ class MDFormatter(string.Formatter):
         
         return result
 
-def md_format(string: str, **values: dict[str,str]):
+def md_format(string: str, *args, **values: dict[str,str]):
+    dir = '.'
+    if len(args) > 0:
+        dir = args[0]
+    
     for key in values:
         try:
             values[key] = int(values[key])
@@ -280,7 +288,7 @@ def md_format(string: str, **values: dict[str,str]):
                 values[key] = float(values[key])
             except:
                 pass
-    return MDFormatter().format(string, **values)
+    return MDFormatter(dir).format(string, **values)
 
 def parse_format_spec(format_spec: str):
     """
