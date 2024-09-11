@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 import charset_normalizer
 
-from .utils import escape
+from .utils import escape, strnum
 
 if TYPE_CHECKING:
     from .components import BaseNode
@@ -192,7 +192,7 @@ class MDFormatter(string.Formatter):
         # if isinstance(value, MissingKey):
         #     return f'{{{super().format_field(value, format_spec)}}}'
         
-        result = str(value)
+        result = None
         
         old = format_spec
         split_spec, rest = parse_format_spec_part(format_spec)
@@ -232,6 +232,9 @@ class MDFormatter(string.Formatter):
                         component = self.COMPONENTS[component_name](value)
                         result = super().format_field(component, rest)
                         break
+                    elif part in ['n', 'num']:
+                        print('is num', type(value))
+                        value = strnum(value)
                     else:
                         result = super().format_field(value, old)
                         break
@@ -256,7 +259,11 @@ class MDFormatter(string.Formatter):
                     else:
                         result = super().format_field(value, old)
                         break
-        else:
+            
+                old = rest
+                split_spec, rest = parse_format_spec_part(rest)
+        
+        if result == None:
             result = super().format_field(value, old)
         
         if hasattr(value, 'conversion') and value.conversion:

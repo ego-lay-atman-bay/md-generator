@@ -22,3 +22,11 @@ def backtick_count(text: str, start = 1) -> int:
 def strbool(value: str):
     value = (value).lower()
     return value in ['true', 't', '1']
+
+def strnum(num: str):
+    try:
+        return int(str(num))
+    except ValueError:
+        return float(str(num))
+    except:
+        return num
