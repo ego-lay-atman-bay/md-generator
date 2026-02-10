@@ -1,9 +1,11 @@
-import re
-from typing import TYPE_CHECKING, Callable, Any, Mapping
-from copy import deepcopy
-import string
+import io
 import os
+import re
+import string
+import _string # builtin private module
 from collections.abc import Sequence
+from copy import deepcopy
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 import charset_normalizer
 
@@ -71,39 +73,7 @@ class FileContents():
     
     def __format__(self, format_spec: str) -> str:
         return f'{str(self)}{':' if format_spec else ''}{format_spec}'
-    
 
-# class MDFormatter():
-#     COMPONENTS = {}
-#     
-#     def __init__(self, data):
-#         self.data = data
-#     @classmethod
-#     def register_component(cls, name: str, component: "BaseNode | Callable[[str], BaseNode]"):
-#         if not isinstance(name, str):
-#             raise TypeError('name must be str')
-#         
-#         cls.COMPONENTS[name.lower()] = component
-#         
-#     def __format__(self, format_spec: str) -> str:
-#         result = str(self.data)
-#         split_spec = format_spec.split(':')
-#         
-#         if len(split_spec) > 0:
-#             component_name = split_spec[0].lower()
-#             if not component_name in self.COMPONENTS:
-#                 return result.__format__(format_spec)
-#             
-#             component = self.COMPONENTS[component_name](self.data)
-#             return component.__format__(':'.join(split_spec[1::]))
-#         else:
-#             return result.__format__(format_spec)
-#     
-#     def __str__(self) -> str:
-#         return str(self.data)
-#     
-#     def __repr__(self) -> str:
-#         return repr(self.data)
 
 class SafeFormatDict(dict):
     def __missing__(self, key):
@@ -149,6 +119,8 @@ class MDFormatter(string.Formatter):
         super().__init__()
     
     def vformat(self, format_string, args, kwargs):
+        # print('vformat')
+        # print(format_string)
         used_args = set()
         result, _ = self._vformat(format_string, args, kwargs, used_args, 99) # I want a large recursive limit
         self.check_unused_args(used_args, args, kwargs)
@@ -166,11 +138,16 @@ class MDFormatter(string.Formatter):
             value, key = super().get_field(field_name, args, kwargs)
             return KeyValue(field_name, value), key
         except:
-            if field_name.startswith('[') and field_name.endswith(']') and os.path.isfile(os.path.join(self.base_dir, field_name[1:-1])):
-                contents = field_name[1:-1]
-                file = charset_normalizer.from_path(os.path.join(self.base_dir, field_name[1:-1])).best()
+            first, rest = _string.formatter_field_name_split(field_name)
+            first: str
+            rest: list[tuple[bool, str]] = list[tuple[bool, str]](rest)
+            
+
+            if len(rest) == 1 and rest[0][0] is False and os.path.isfile(os.path.join(self.base_dir, rest[0][1])):
+                contents = rest[1:-1]
+                file = charset_normalizer.from_path(os.path.join(self.base_dir, rest[0][1])).best()
                 contents = file.output().decode()
-                return KeyValue(field_name, FileContents(contents)), field_name
+                return KeyValue(f'[{rest[0][1]}]', FileContents(contents)), f'[{rest[0][1]}]'
             else:
                 return KeyValue(field_name, MissingKey(field_name)), field_name
     
@@ -237,7 +214,6 @@ class MDFormatter(string.Formatter):
                         result = super().format_field(component, rest)
                         break
                     elif part in ['n', 'num']:
-                        print('is num', type(value))
                         value = strnum(value)
                     else:
                         result = super().format_field(value, old)
@@ -276,6 +252,9 @@ class MDFormatter(string.Formatter):
         return result
 
 def md_format(string: str, *args, **values: dict[str,str]):
+    # print('md_format')
+    # print(string)
+    
     dir = '.'
     if len(args) > 0:
         dir = args[0]
@@ -289,6 +268,20 @@ def md_format(string: str, *args, **values: dict[str,str]):
             except:
                 pass
     return MDFormatter(dir).format(string, **values)
+
+class MD_Format():
+    def __init__(self, value, *args, **kwargs) -> None:
+        self.value = value
+        self.args = args
+        self.kwargs = kwargs
+    
+    def __format__(self, format_spec: str) -> str:
+        return md_format(str(self.value), *self.args, **self.kwargs)
+
+MDFormatter.register_component(
+    'format',
+    MD_Format,
+)
 
 def parse_format_spec(format_spec: str):
     """

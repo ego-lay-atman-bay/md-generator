@@ -26,9 +26,10 @@ class Table(BaseBlockNode):
         super().__init__()
         
         if rows == None:
-            if isinstance(header[0], (list, tuple, set)):
-                rows = header[1::]
-                header = header[0]
+            if len(header) > 0:
+                if isinstance(header[0], (list, tuple, set)):
+                    rows = header[1::]
+                    header = header[0]
         
         self.header = header
         self.display_header = None
@@ -151,7 +152,9 @@ class Table(BaseBlockNode):
         
         for key, item in keys.items():
             if not key in self.header:
-                raise KeyError(f'key "{key}" is not in header')
+                e = KeyError(f'key "{key}" is not in header {self.header}')
+                e.add_note(str(self))
+                raise e
             
             rules.append((self.header.index(key), item))
         
@@ -282,8 +285,6 @@ class Table(BaseBlockNode):
         formatted_table = deepcopy(self)
         
         split_spec = parse_format_spec(format_spec)
-
-        print('spec', format_spec)
         
         for part in split_spec:
             if isinstance(part, tuple):

@@ -1,5 +1,7 @@
 import re
 
+
+
 def indent(text: str, amount: int = 4, char: str = " "):
     return ''.join([(char * amount) + l for l in text.splitlines(True)])
 
@@ -26,7 +28,9 @@ def strbool(value: str):
 def strnum(num: str):
     try:
         return int(str(num))
-    except ValueError:
-        return float(str(num))
     except:
-        return num
+        try:
+            return float(str(num))
+        except:
+            return num
+

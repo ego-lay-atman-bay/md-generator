@@ -37,6 +37,7 @@ for name, component in {
     "bold": lambda x: Text(x, bold = True),
     "italic": lambda x: Text(x, italic = True),
     "code": lambda x: Text(x, code = True),
-    "split": Group.from_str
+    "split": Group.from_str,
+    "replace": Group.from_str,
 }.items():
     MDFormatter.register_component(name, component)

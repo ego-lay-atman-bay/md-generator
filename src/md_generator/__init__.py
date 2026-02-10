@@ -18,7 +18,9 @@ from .components.paragraph import Paragraph
 from .components.sentence import Sentence
 from .components.table import Table
 from .components.text import Text
+from .json_file import JsonContent
 from .md_format import md_format
+from .components import enums
 
 __all__ = [
     "BaseNode",
@@ -39,4 +41,7 @@ __all__ = [
     "NewLine",
     "HorizontalRule",
     "md_format",
+    "enums",
 ]
+
+
